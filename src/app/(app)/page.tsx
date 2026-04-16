@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { getUserHabits, getHabitStreak, getOverallStats } from "@/lib/habits";
 import DashboardClient from "./DashboardClient";
 import { format } from "date-fns";
+import type { Habit, HabitLog } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function DashboardPage() {
   ]);
 
   const habits = await Promise.all(
-    habitsRaw.map(async (h) => ({
+    habitsRaw.map(async (h: Habit & { logs: HabitLog[] }) => ({
       id: h.id,
       name: h.name,
       description: h.description,

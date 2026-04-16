@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { getHabitTrends, getOverallStats, getHabitStreak } from "@/lib/habits";
 import { prisma } from "@/lib/prisma";
 import TrendsClient from "./TrendsClient";
+import type { Habit, HabitLog } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,14 @@ export default async function TrendsPage() {
   ]);
 
   const habits = await Promise.all(
-    habitsRaw.map(async (h) => ({
+    habitsRaw.map(async (h: Habit & { logs: HabitLog[] }) => ({
       id: h.id,
       name: h.name,
       color: h.color,
       icon: h.icon,
       streak: await getHabitStreak(h.id),
       totalLogs: h.logs.length,
-      logs: h.logs.map((l) => l.completedAt.toISOString()),
+      logs: h.logs.map((l: HabitLog) => l.completedAt.toISOString()),
     }))
   );
 

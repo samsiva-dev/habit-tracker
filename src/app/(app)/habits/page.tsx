@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getHabitStreak } from "@/lib/habits";
 import HabitsClient from "./HabitsClient";
+import type { Habit } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function HabitsPage() {
   });
 
   const habits = await Promise.all(
-    habitsRaw.map(async (h) => ({
+    habitsRaw.map(async (h: Habit & { _count: { logs: number } }) => ({
       id: h.id,
       name: h.name,
       description: h.description,
