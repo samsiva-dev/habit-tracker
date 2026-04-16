@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 const ALLOWED_USERNAME = process.env.ALLOWED_GITHUB_USERNAME;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
