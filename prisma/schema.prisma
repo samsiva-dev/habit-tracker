@@ -61,6 +61,9 @@ model Habit {
   color       String     @default("#6366f1")
   icon        String     @default("✓")
   frequency   String     @default("daily")
+  startDate   DateTime?
+  endDate     DateTime?
+  targetDays  Int[]      @default([])
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   archivedAt  DateTime?
