@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Flame, Pencil, Trash2, Target } from "lucide-react";
+import { Plus, Flame, Pencil, Trash2, Target, CalendarDays } from "lucide-react";
 import HabitForm from "@/components/HabitForm";
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface Habit {
   id: string;
@@ -11,6 +13,9 @@ interface Habit {
   color: string;
   icon: string;
   frequency: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  targetDays: number[];
   streak: number;
   totalLogs: number;
   createdAt: string;
@@ -29,6 +34,9 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
     color: string;
     icon: string;
     frequency: string;
+    startDate: string | null;
+    endDate: string | null;
+    targetDays: number[];
   }) {
     const res = await fetch("/api/habits", {
       method: "POST",
@@ -47,6 +55,9 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
     color: string;
     icon: string;
     frequency: string;
+    startDate: string | null;
+    endDate: string | null;
+    targetDays: number[];
   }) {
     if (!editing) return;
     const res = await fetch(`/api/habits/${editing.id}`, {
@@ -74,6 +85,13 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
       setDeleting(null);
       setConfirmDelete(null);
     }
+  }
+
+  function formatDateRange(startDate?: string | null, endDate?: string | null) {
+    if (!startDate && !endDate) return null;
+    if (startDate && endDate) return `${startDate} → ${endDate}`;
+    if (startDate) return `From ${startDate}`;
+    return `Until ${endDate}`;
   }
 
   return (
@@ -125,91 +143,110 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {habits.map((h) => (
-            <div
-              key={h.id}
-              className="relative bg-gray-900 border border-gray-800 rounded-2xl p-4"
-            >
+          {habits.map((h) => {
+            const dateRange = formatDateRange(h.startDate, h.endDate);
+            const activeDays =
+              h.frequency === "weekly" && h.targetDays.length > 0
+                ? h.targetDays.sort((a, b) => a - b).map((d) => DAYS[d]).join(", ")
+                : null;
+
+            return (
               <div
-                className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
-                style={{ backgroundColor: h.color }}
-              />
-
-              <div className="flex items-center gap-3 ml-2">
-                {/* Icon */}
+                key={h.id}
+                className="relative bg-gray-900 border border-gray-800 rounded-2xl p-4"
+              >
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0"
+                  className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
                   style={{ backgroundColor: h.color }}
-                >
-                  <span className="text-white">{h.icon}</span>
-                </div>
+                />
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold truncate">{h.name}</p>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    {h.description && (
-                      <p className="text-gray-500 text-xs truncate max-w-[160px]">
-                        {h.description}
-                      </p>
-                    )}
-                    <span className="text-gray-600 text-xs capitalize shrink-0">
-                      {h.frequency}
-                    </span>
-                    {h.streak > 0 && (
-                      <span className="flex items-center gap-0.5 shrink-0">
-                        <Flame size={11} className="text-orange-400" />
-                        <span className="text-orange-400 text-xs font-bold">
-                          {h.streak}
-                        </span>
+                <div className="flex items-center gap-3 ml-2">
+                  {/* Icon */}
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0"
+                    style={{ backgroundColor: h.color }}
+                  >
+                    <span className="text-white">{h.icon}</span>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold truncate">{h.name}</p>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {h.description && (
+                        <p className="text-gray-500 text-xs truncate max-w-[160px]">
+                          {h.description}
+                        </p>
+                      )}
+                      <span className="text-gray-600 text-xs capitalize shrink-0">
+                        {h.frequency}
                       </span>
-                    )}
-                    <span className="text-gray-600 text-xs shrink-0">
-                      {h.totalLogs} logs
-                    </span>
+                      {activeDays && (
+                        <span className="text-indigo-400 text-xs shrink-0">
+                          {activeDays}
+                        </span>
+                      )}
+                      {dateRange && (
+                        <span className="flex items-center gap-0.5 text-gray-500 text-xs shrink-0">
+                          <CalendarDays size={10} />
+                          {dateRange}
+                        </span>
+                      )}
+                      {h.streak > 0 && (
+                        <span className="flex items-center gap-0.5 shrink-0">
+                          <Flame size={11} className="text-orange-400" />
+                          <span className="text-orange-400 text-xs font-bold">
+                            {h.streak}
+                          </span>
+                        </span>
+                      )}
+                      <span className="text-gray-600 text-xs shrink-0">
+                        {h.totalLogs} logs
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setEditing(h)}
+                      className="p-2 text-gray-500 hover:text-indigo-400 transition-colors rounded-lg hover:bg-gray-800"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(h.id)}
+                      className="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-800"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => setEditing(h)}
-                    className="p-2 text-gray-500 hover:text-indigo-400 transition-colors rounded-lg hover:bg-gray-800"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(h.id)}
-                    className="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-800"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
+                {/* Inline delete confirm */}
+                {confirmDelete === h.id && (
+                  <div className="mt-3 ml-2 p-3 bg-gray-800 rounded-xl flex items-center justify-between gap-3">
+                    <p className="text-sm text-gray-300">Delete this habit?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleDelete(h.id)}
+                        disabled={deleting === h.id}
+                        className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-60"
+                      >
+                        {deleting === h.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Inline delete confirm */}
-              {confirmDelete === h.id && (
-                <div className="mt-3 ml-2 p-3 bg-gray-800 rounded-xl flex items-center justify-between gap-3">
-                  <p className="text-sm text-gray-300">Delete this habit?</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setConfirmDelete(null)}
-                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleDelete(h.id)}
-                      disabled={deleting === h.id}
-                      className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-60"
-                    >
-                      {deleting === h.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

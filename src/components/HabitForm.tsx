@@ -11,6 +11,8 @@ const COLORS = [
 
 const ICONS = ["✓", "💪", "🏃", "📚", "💧", "🧘", "🍎", "😴", "✍️", "🎯"];
 
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 interface HabitFormProps {
   initial?: {
     id?: string;
@@ -19,6 +21,9 @@ interface HabitFormProps {
     color: string;
     icon: string;
     frequency: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    targetDays?: number[];
   };
   onSave: (data: {
     name: string;
@@ -26,6 +31,9 @@ interface HabitFormProps {
     color: string;
     icon: string;
     frequency: string;
+    startDate: string | null;
+    endDate: string | null;
+    targetDays: number[];
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -36,8 +44,24 @@ export default function HabitForm({ initial, onSave, onCancel }: HabitFormProps)
   const [color, setColor] = useState(initial?.color ?? "#6366f1");
   const [icon, setIcon] = useState(initial?.icon ?? "✓");
   const [frequency, setFrequency] = useState(initial?.frequency ?? "daily");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [targetDays, setTargetDays] = useState<number[]>(initial?.targetDays ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function toggleDay(day: number) {
+    setTargetDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }
+
+  function handleFrequencyChange(f: string) {
+    setFrequency(f);
+    if (f === "daily") {
+      setTargetDays([]);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,10 +69,27 @@ export default function HabitForm({ initial, onSave, onCancel }: HabitFormProps)
       setError("Habit name is required");
       return;
     }
+    if (frequency === "weekly" && targetDays.length === 0) {
+      setError("Select at least one day for a weekly habit");
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setError("End date must be on or after start date");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
-      await onSave({ name, description, color, icon, frequency });
+      await onSave({
+        name,
+        description,
+        color,
+        icon,
+        frequency,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        targetDays,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -162,7 +203,7 @@ export default function HabitForm({ initial, onSave, onCancel }: HabitFormProps)
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setFrequency(f)}
+                  onClick={() => handleFrequencyChange(f)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium capitalize transition-all ${
                     frequency === f
                       ? "bg-indigo-600 text-white"
@@ -172,6 +213,58 @@ export default function HabitForm({ initial, onSave, onCancel }: HabitFormProps)
                   {f}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Day selector — shown only for weekly habits */}
+          {frequency === "weekly" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Active days *
+              </label>
+              <div className="flex gap-1.5">
+                {DAYS.map((day, index) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(index)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      targetDays.includes(index)
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Start date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                End date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 [color-scheme:dark]"
+              />
             </div>
           </div>
 
@@ -187,7 +280,14 @@ export default function HabitForm({ initial, onSave, onCancel }: HabitFormProps)
               <p className="text-white text-sm font-medium">
                 {name || "Habit name"}
               </p>
-              <p className="text-gray-500 text-xs capitalize">{frequency}</p>
+              <p className="text-gray-500 text-xs capitalize">
+                {frequency}
+                {frequency === "weekly" && targetDays.length > 0 && (
+                  <span className="ml-1">
+                    · {targetDays.sort((a, b) => a - b).map((d) => DAYS[d]).join(", ")}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 

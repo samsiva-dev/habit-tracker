@@ -2,14 +2,24 @@ import { prisma } from "@/lib/prisma";
 import { startOfDay, endOfDay, subDays, format } from "date-fns";
 
 export async function getUserHabits(userId: string) {
-  return prisma.habit.findMany({
-    where: { userId, archivedAt: null },
+  const today = startOfDay(new Date());
+  const todayDayIndex = new Date().getDay(); // 0=Sun, 6=Sat
+
+  const habits = await prisma.habit.findMany({
+    where: {
+      userId,
+      archivedAt: null,
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: endOfDay(today) } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: today } }] },
+      ],
+    },
     include: {
       logs: {
         where: {
           completedAt: {
-            gte: startOfDay(new Date()),
-            lte: endOfDay(new Date()),
+            gte: today,
+            lte: endOfDay(today),
           },
         },
         orderBy: { completedAt: "desc" },
@@ -17,6 +27,11 @@ export async function getUserHabits(userId: string) {
     },
     orderBy: { createdAt: "asc" },
   });
+
+  // Filter by targetDays: empty array means the habit appears every day
+  return habits.filter(
+    (h) => h.targetDays.length === 0 || h.targetDays.includes(todayDayIndex)
+  );
 }
 
 export async function getHabitStreak(habitId: string): Promise<number> {

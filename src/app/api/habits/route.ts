@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, description, color, icon, frequency } = body;
+  const { name, description, color, icon, frequency, startDate, endDate, targetDays } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
       color: color ?? "#6366f1",
       icon: icon ?? "✓",
       frequency: frequency ?? "daily",
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
+      targetDays: targetDays ?? [],
     },
   });
 
