@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Flame, Pencil, Trash2, Target, CalendarDays } from "lucide-react";
+import { Plus, Flame, Pencil, Trash2, Target, CalendarDays, ArchiveRestore, ChevronDown, ChevronUp } from "lucide-react";
 import HabitForm from "@/components/HabitForm";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -21,12 +21,21 @@ interface Habit {
   createdAt: string;
 }
 
-export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
+export default function HabitsClient({
+  habits: initial,
+  archivedHabits: initialArchived,
+}: {
+  habits: Habit[];
+  archivedHabits: Habit[];
+}) {
   const [habits, setHabits] = useState(initial);
+  const [archived, setArchived] = useState(initialArchived);
+  const [showArchived, setShowArchived] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   async function handleCreate(data: {
     name: string;
@@ -80,10 +89,25 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
     try {
       const res = await fetch(`/api/habits/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
+      const habit = habits.find((h) => h.id === id);
       setHabits((prev) => prev.filter((h) => h.id !== id));
+      if (habit) setArchived((prev) => [habit, ...prev]);
     } finally {
       setDeleting(null);
       setConfirmDelete(null);
+    }
+  }
+
+  async function handleRestore(id: string) {
+    setRestoring(id);
+    try {
+      const res = await fetch(`/api/habits/${id}`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
+      const habit = archived.find((h) => h.id === id);
+      setArchived((prev) => prev.filter((h) => h.id !== id));
+      if (habit) setHabits((prev) => [...prev, habit]);
+    } finally {
+      setRestoring(null);
     }
   }
 
@@ -247,6 +271,55 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Archived habits section */}
+      {archived.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 text-sm transition-colors"
+          >
+            {showArchived ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {archived.length} archived habit{archived.length !== 1 ? "s" : ""}
+          </button>
+
+          {showArchived && (
+            <div className="mt-3 space-y-2">
+              {archived.map((h) => (
+                <div
+                  key={h.id}
+                  className="relative bg-gray-900/50 border border-gray-800 rounded-2xl p-4 opacity-60"
+                >
+                  <div
+                    className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
+                    style={{ backgroundColor: h.color }}
+                  />
+                  <div className="flex items-center gap-3 ml-2">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0"
+                      style={{ backgroundColor: h.color }}
+                    >
+                      <span className="text-white">{h.icon}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-400 font-semibold truncate">{h.name}</p>
+                      <p className="text-gray-600 text-xs">{h.totalLogs} total logs</p>
+                    </div>
+                    <button
+                      onClick={() => handleRestore(h.id)}
+                      disabled={restoring === h.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-800 hover:border-indigo-600 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <ArchiveRestore size={13} />
+                      {restoring === h.id ? "Restoring..." : "Restore"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
