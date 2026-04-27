@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { LayoutDashboard, Target, TrendingUp, LogOut } from "lucide-react";
+import { LayoutDashboard, Target, TrendingUp, LogOut, CalendarCheck } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Today", icon: LayoutDashboard },
   { href: "/habits", label: "Habits", icon: Target },
   { href: "/trends", label: "Trends", icon: TrendingUp },
+  { href: "/challenges", label: "30 Days", icon: CalendarCheck },
 ];
 
 export default function Navbar() {
