@@ -96,6 +96,7 @@ model Challenge {
   color       String         @default("#6366f1")
   icon        String         @default("🎯")
   startDate   DateTime
+  duration    Int            @default(30)
 
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

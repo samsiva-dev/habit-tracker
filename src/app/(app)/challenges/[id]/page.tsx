@@ -29,6 +29,7 @@ export default async function ChallengeDetailPage({
       color={challenge.color}
       icon={challenge.icon}
       startDate={challenge.startDate.toISOString()}
+      duration={challenge.duration}
       initialCompletedDays={challenge.logs.map((l) => l.dayNumber)}
     />
   );

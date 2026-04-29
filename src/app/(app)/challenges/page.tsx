@@ -21,6 +21,7 @@ export default async function ChallengesPage() {
     color: c.color,
     icon: c.icon,
     startDate: c.startDate.toISOString(),
+    duration: c.duration,
     completedDays: c.logs.map((l) => l.dayNumber),
   }));
 

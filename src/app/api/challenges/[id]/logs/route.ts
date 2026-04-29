@@ -23,7 +23,7 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const dayNumber = Number(body.dayNumber);
 
-  if (!dayNumber || dayNumber < 1 || dayNumber > 30) {
+  if (!dayNumber || dayNumber < 1 || dayNumber > challenge.duration) {
     return NextResponse.json({ error: "Invalid day number" }, { status: 400 });
   }
 
