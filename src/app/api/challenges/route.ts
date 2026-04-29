@@ -24,13 +24,19 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { name, description, color, icon, startDate } = body;
+  const { name, description, color, icon, startDate, duration } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
   if (!startDate) {
     return NextResponse.json({ error: "Start date is required" }, { status: 400 });
+  }
+
+  const validDurations = [30, 90, 180, 365];
+  const parsedDuration = Number(duration);
+  if (!validDurations.includes(parsedDuration)) {
+    return NextResponse.json({ error: "Invalid duration" }, { status: 400 });
   }
 
   const challenge = await prisma.challenge.create({
@@ -41,6 +47,7 @@ export async function POST(req: NextRequest) {
       color: color ?? "#6366f1",
       icon: icon ?? "🎯",
       startDate: new Date(startDate),
+      duration: parsedDuration,
     },
     include: { logs: true },
   });
