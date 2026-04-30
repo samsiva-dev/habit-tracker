@@ -3,8 +3,14 @@
 import { useState } from "react";
 import { Plus, Flame, Pencil, Trash2, Target, CalendarDays } from "lucide-react";
 import HabitForm from "@/components/HabitForm";
+import { BADGE_DEFINITIONS } from "@/lib/badges";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+interface Achievement {
+  type: string;
+  earnedAt: string;
+}
 
 interface Habit {
   id: string;
@@ -19,6 +25,7 @@ interface Habit {
   streak: number;
   totalLogs: number;
   createdAt: string;
+  achievements: Achievement[];
 }
 
 export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
@@ -45,7 +52,7 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
     });
     if (!res.ok) throw new Error("Failed to create habit");
     const habit = await res.json();
-    setHabits((prev) => [...prev, { ...habit, streak: 0, totalLogs: 0 }]);
+    setHabits((prev) => [...prev, { ...habit, streak: 0, totalLogs: 0, achievements: [] }]);
     setShowForm(false);
   }
 
@@ -203,6 +210,23 @@ export default function HabitsClient({ habits: initial }: { habits: Habit[] }) {
                       <span className="text-gray-600 text-xs shrink-0">
                         {h.totalLogs} logs
                       </span>
+                      {h.achievements.length > 0 && (
+                        <span
+                          className="flex items-center gap-0.5 shrink-0"
+                          title={h.achievements
+                            .map((a) => BADGE_DEFINITIONS.find((d) => d.type === a.type)?.label ?? a.type)
+                            .join(", ")}
+                        >
+                          {h.achievements.map((a) => {
+                            const def = BADGE_DEFINITIONS.find((d) => d.type === a.type);
+                            return (
+                              <span key={a.type} className="text-sm leading-none">
+                                {def?.emoji ?? "🏅"}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      )}
                     </div>
                   </div>
 

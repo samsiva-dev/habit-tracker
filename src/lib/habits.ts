@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { startOfDay, endOfDay, subDays, format } from "date-fns";
+import { BADGE_DEFINITIONS, type BadgeDefinition, type BadgeType } from "@/lib/badges";
 
 export async function getUserHabits(userId: string) {
   const today = startOfDay(new Date());
@@ -163,4 +164,58 @@ export async function getOverallStats(userId: string) {
     avgCompletionRate: Math.round(avgCompletionRate),
     streaks,
   };
+}
+
+// ── Badge helpers ─────────────────────────────────────────────────────────────
+
+export async function checkAndAwardBadges(
+  habitId: string,
+  userId: string,
+  streak: number
+): Promise<BadgeDefinition[]> {
+  const newlyEarned: BadgeDefinition[] = [];
+  for (const def of BADGE_DEFINITIONS) {
+    if (streak >= def.threshold) {
+      const existing = await prisma.achievement.findUnique({
+        where: { habitId_type: { habitId, type: def.type } },
+      });
+      if (!existing) {
+        await prisma.achievement.create({ data: { habitId, userId, type: def.type } });
+        newlyEarned.push(def);
+      }
+    }
+  }
+  return newlyEarned;
+}
+
+export async function getHabitAchievements(
+  habitId: string
+): Promise<{ type: BadgeType; earnedAt: Date }[]> {
+  const rows = await prisma.achievement.findMany({ where: { habitId } });
+  return rows as { type: BadgeType; earnedAt: Date }[];
+}
+
+export interface UserAchievementSummary {
+  habitId: string;
+  habitName: string;
+  habitColor: string;
+  type: BadgeType;
+  earnedAt: Date;
+}
+
+export async function getUserAchievements(
+  userId: string
+): Promise<UserAchievementSummary[]> {
+  const rows = await prisma.achievement.findMany({
+    where: { userId, habit: { archivedAt: null } },
+    include: { habit: { select: { name: true, color: true } } },
+    orderBy: { earnedAt: "desc" },
+  });
+  return rows.map((r) => ({
+    habitId:    r.habitId,
+    habitName:  r.habit.name,
+    habitColor: r.habit.color,
+    type:       r.type as BadgeType,
+    earnedAt:   r.earnedAt,
+  }));
 }

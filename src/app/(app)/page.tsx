@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getUserHabits, getHabitStreak, getOverallStats } from "@/lib/habits";
+import { getUserHabits, getHabitStreak, getOverallStats, getUserAchievements } from "@/lib/habits";
 import DashboardClient from "./DashboardClient";
 import { format } from "date-fns";
 import type { Habit, HabitLog } from "@prisma/client";
@@ -10,9 +10,10 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const [habitsRaw, stats] = await Promise.all([
+  const [habitsRaw, stats, achievementsRaw] = await Promise.all([
     getUserHabits(session.user.id),
     getOverallStats(session.user.id),
+    getUserAchievements(session.user.id),
   ]);
 
   const habits = await Promise.all(
@@ -27,6 +28,14 @@ export default async function DashboardPage() {
     }))
   );
 
+  const milestones = achievementsRaw.map((a) => ({
+    habitId:    a.habitId,
+    habitName:  a.habitName,
+    habitColor: a.habitColor,
+    type:       a.type,
+    earnedAt:   a.earnedAt.toISOString(),
+  }));
+
   const today = format(new Date(), "EEEE, MMMM d");
 
   return (
@@ -35,6 +44,7 @@ export default async function DashboardPage() {
       stats={stats}
       today={today}
       userName={session.user.name ?? ""}
+      milestones={milestones}
     />
   );
 }

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getHabitStreak } from "@/lib/habits";
+import { getHabitStreak, getHabitAchievements } from "@/lib/habits";
 import HabitsClient from "./HabitsClient";
 import { format } from "date-fns";
 import type { Habit } from "@prisma/client";
@@ -31,6 +31,10 @@ export default async function HabitsPage() {
       streak: await getHabitStreak(h.id),
       totalLogs: h._count.logs,
       createdAt: h.createdAt.toISOString(),
+      achievements: (await getHabitAchievements(h.id)).map((a) => ({
+        type:     a.type,
+        earnedAt: a.earnedAt.toISOString(),
+      })),
     }))
   );
 

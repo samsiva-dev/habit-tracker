@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Flame } from "lucide-react";
+
+interface NewBadge {
+  type: string;
+  label: string;
+  emoji: string;
+}
 
 interface HabitCardProps {
   id: string;
@@ -12,6 +18,7 @@ interface HabitCardProps {
   streak: number;
   completedToday: boolean;
   onToggle: (id: string) => void;
+  onBadgeEarned?: (id: string, badges: NewBadge[]) => void;
 }
 
 export default function HabitCard({
@@ -23,9 +30,12 @@ export default function HabitCard({
   streak,
   completedToday,
   onToggle,
+  onBadgeEarned,
 }: HabitCardProps) {
   const [loading, setLoading] = useState(false);
   const [localCompleted, setLocalCompleted] = useState(completedToday);
+  const [badgeFlash, setBadgeFlash] = useState<NewBadge | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleToggle() {
     if (loading) return;
@@ -37,6 +47,14 @@ export default function HabitCard({
       const data = await res.json();
       setLocalCompleted(data.completed);
       onToggle(id);
+
+      if (data.completed && data.newBadges?.length) {
+        const highest: NewBadge = data.newBadges[data.newBadges.length - 1];
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        setBadgeFlash(highest);
+        onBadgeEarned?.(id, data.newBadges);
+        flashTimer.current = setTimeout(() => setBadgeFlash(null), 3500);
+      }
     } catch {
       setLocalCompleted(prev);
     } finally {
@@ -98,6 +116,16 @@ export default function HabitCard({
         <div className="flex items-center gap-1 shrink-0">
           <Flame size={14} className="text-orange-400" />
           <span className="text-orange-400 text-sm font-bold">{streak}</span>
+        </div>
+      )}
+
+      {/* New badge flash */}
+      {badgeFlash && (
+        <div className="absolute inset-x-0 bottom-0 rounded-b-2xl bg-indigo-950 border-t border-indigo-800 px-4 py-2 flex items-center gap-2">
+          <span className="text-base">{badgeFlash.emoji}</span>
+          <span className="text-indigo-300 text-xs font-semibold">
+            New badge: {badgeFlash.label}!
+          </span>
         </div>
       )}
     </div>
