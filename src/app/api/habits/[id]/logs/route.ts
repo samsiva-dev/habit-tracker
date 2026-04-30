@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfDay, endOfDay } from "date-fns";
+import { getHabitStreak, checkAndAwardBadges } from "@/lib/habits";
 
 export async function POST(
   req: NextRequest,
@@ -48,7 +49,18 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ completed: true, log }, { status: 201 });
+  const streak = await getHabitStreak(id);
+  const newBadges = await checkAndAwardBadges(id, session.user.id, streak);
+
+  return NextResponse.json(
+    {
+      completed: true,
+      log,
+      streak,
+      newBadges: newBadges.map((b) => ({ type: b.type, label: b.label, emoji: b.emoji })),
+    },
+    { status: 201 }
+  );
 }
 
 export async function GET(

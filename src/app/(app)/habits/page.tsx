@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getHabitStreak } from "@/lib/habits";
+import { getHabitStreak, getHabitAchievements } from "@/lib/habits";
 import HabitsClient from "./HabitsClient";
 import { format } from "date-fns";
 import type { Habit } from "@prisma/client";
@@ -44,12 +44,17 @@ export default async function HabitsPage() {
     habitsRaw.map(async (h) => ({
       ...mapHabit(h),
       streak: await getHabitStreak(h.id),
+      achievements: (await getHabitAchievements(h.id)).map((a) => ({
+        type:     a.type,
+        earnedAt: a.earnedAt.toISOString(),
+      })),
     }))
   );
 
   const archivedHabits = archivedRaw.map((h) => ({
     ...mapHabit(h),
     streak: 0,
+    achievements: [],
   }));
 
   return <HabitsClient habits={habits} archivedHabits={archivedHabits} />;

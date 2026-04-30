@@ -44,6 +44,7 @@ model User {
   sessions       Session[]
   habits         Habit[]
   challenges     Challenge[]
+  achievements   Achievement[]
 }
 
 model VerificationToken {
@@ -69,8 +70,9 @@ model Habit {
   updatedAt   DateTime   @updatedAt
   archivedAt  DateTime?
 
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs        HabitLog[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs         HabitLog[]
+  achievements Achievement[]
 
   @@index([userId])
 }
@@ -118,4 +120,19 @@ model ChallengeLog {
 
   @@unique([challengeId, dayNumber])
   @@index([challengeId])
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  habitId   String
+  userId    String
+  type      String
+  earnedAt  DateTime @default(now())
+
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, type])
+  @@index([userId])
+  @@index([habitId])
 }
