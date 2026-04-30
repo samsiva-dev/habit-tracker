@@ -11,14 +11,21 @@ export default async function HabitsPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const habitsRaw = await prisma.habit.findMany({
-    where: { userId: session.user.id, archivedAt: null },
-    include: { _count: { select: { logs: true } } },
-    orderBy: { createdAt: "asc" },
-  });
+  const [habitsRaw, archivedRaw] = await Promise.all([
+    prisma.habit.findMany({
+      where: { userId: session.user.id, archivedAt: null },
+      include: { _count: { select: { logs: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.habit.findMany({
+      where: { userId: session.user.id, archivedAt: { not: null } },
+      include: { _count: { select: { logs: true } } },
+      orderBy: { archivedAt: "desc" },
+    }),
+  ]);
 
-  const habits = await Promise.all(
-    habitsRaw.map(async (h: Habit & { _count: { logs: number } }) => ({
+  function mapHabit(h: Habit & { _count: { logs: number } }) {
+    return {
       id: h.id,
       name: h.name,
       description: h.description,
@@ -27,10 +34,16 @@ export default async function HabitsPage() {
       frequency: h.frequency,
       startDate: h.startDate ? format(h.startDate, "yyyy-MM-dd") : null,
       endDate: h.endDate ? format(h.endDate, "yyyy-MM-dd") : null,
-      targetDays: h.targetDays,
-      streak: await getHabitStreak(h.id),
+      targetDays: h.targetDays as number[],
       totalLogs: h._count.logs,
       createdAt: h.createdAt.toISOString(),
+    };
+  }
+
+  const habits = await Promise.all(
+    habitsRaw.map(async (h) => ({
+      ...mapHabit(h),
+      streak: await getHabitStreak(h.id),
       achievements: (await getHabitAchievements(h.id)).map((a) => ({
         type:     a.type,
         earnedAt: a.earnedAt.toISOString(),
@@ -38,5 +51,11 @@ export default async function HabitsPage() {
     }))
   );
 
-  return <HabitsClient habits={habits} />;
+  const archivedHabits = archivedRaw.map((h) => ({
+    ...mapHabit(h),
+    streak: 0,
+    achievements: [],
+  }));
+
+  return <HabitsClient habits={habits} archivedHabits={archivedHabits} />;
 }

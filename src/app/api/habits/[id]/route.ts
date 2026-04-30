@@ -7,7 +7,6 @@ async function getHabitForUser(habitId: string, userId: string) {
     where: { id: habitId, userId, archivedAt: null },
   });
 }
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -83,4 +82,30 @@ export async function DELETE(
   });
 
   return NextResponse.json({ success: true });
+}
+
+// POST /api/habits/[id]/restore — unarchive a habit
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const habit = await prisma.habit.findFirst({
+    where: { id, userId: session.user.id },
+  });
+  if (!habit) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const restored = await prisma.habit.update({
+    where: { id },
+    data: { archivedAt: null },
+  });
+
+  return NextResponse.json(restored);
 }

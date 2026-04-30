@@ -13,7 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { Flame, Award, TrendingUp, Calendar } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, startOfDay } from "date-fns";
 
 interface TrendPoint {
   date: string;
@@ -27,7 +27,9 @@ interface HabitStats {
   color: string;
   icon: string;
   streak: number;
+  allTimeStreak: number;
   totalLogs: number;
+  scheduledDays: number;
   logs: string[];
 }
 
@@ -48,6 +50,74 @@ interface Props {
 function pct(completed: number, total: number) {
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
+}
+
+// Build 12-week grid (84 days ending today, columns = weeks, rows = Sun–Sat)
+function buildHeatmapWeeks(logDates: string[]): { date: string; filled: boolean }[][] {
+  const logSet = new Set(logDates.map((d) => format(parseISO(d), "yyyy-MM-dd")));
+  const today = startOfDay(new Date());
+  // Start from Sunday of the week 11 full weeks ago
+  const endDay = today;
+  const startDay = subDays(today, 83);
+
+  const weeks: { date: string; filled: boolean }[][] = [];
+  let week: { date: string; filled: boolean }[] = [];
+
+  // Pad to Sunday
+  const startDow = startDay.getDay(); // 0=Sun
+  for (let p = 0; p < startDow; p++) {
+    week.push({ date: "", filled: false });
+  }
+
+  let cursor = new Date(startDay);
+  while (cursor <= endDay) {
+    const dateStr = format(cursor, "yyyy-MM-dd");
+    week.push({ date: dateStr, filled: logSet.has(dateStr) });
+    if (week.length === 7) {
+      weeks.push(week);
+      week = [];
+    }
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  if (week.length > 0) {
+    while (week.length < 7) week.push({ date: "", filled: false });
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+function HeatmapGrid({ logs, color }: { logs: string[]; color: string }) {
+  const weeks = buildHeatmapWeeks(logs);
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  return (
+    <div className="flex gap-0.5 overflow-x-auto pb-1">
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex flex-col gap-0.5">
+          {week.map((cell, di) => (
+            <div
+              key={di}
+              title={cell.date || undefined}
+              className={`w-3 h-3 rounded-sm transition-colors ${
+                !cell.date
+                  ? "bg-transparent"
+                  : cell.date === todayStr
+                  ? "ring-1 ring-white/30"
+                  : ""
+              }`}
+              style={{
+                backgroundColor: cell.date
+                  ? cell.filled
+                    ? color
+                    : "#1f2937"
+                  : "transparent",
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // Custom tooltip for area chart
@@ -78,10 +148,10 @@ export default function TrendsClient({ trends, stats, habits }: Props) {
   // Last 7 days for bar chart
   const last7 = chartData.slice(-7);
 
-  // Compute habit-level completion rate from logs (last 30 days)
+  // Compute habit-level completion rate: logs completed / days the habit was scheduled
   const habitBarData = habits.map((h) => {
-    const rate = trends.length > 0
-      ? Math.round((h.totalLogs / trends.length) * 100)
+    const rate = h.scheduledDays > 0
+      ? Math.round((h.totalLogs / h.scheduledDays) * 100)
       : 0;
     return { name: h.name, rate: Math.min(rate, 100), color: h.color };
   });
@@ -249,19 +319,26 @@ export default function TrendsClient({ trends, stats, habits }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-white truncate">{h.name}</span>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <Flame size={12} className="text-orange-400" />
-                        <span className="text-orange-400 text-xs font-bold">
-                          {h.streak}
-                        </span>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {h.allTimeStreak > h.streak && (
+                          <span className="text-gray-500 text-xs">
+                            best&nbsp;{h.allTimeStreak}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Flame size={12} className="text-orange-400" />
+                          <span className="text-orange-400 text-xs font-bold">
+                            {h.streak}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    {/* Streak bar */}
+                    {/* Streak bar — fills against all-time best for context */}
                     <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${Math.min((h.streak / 30) * 100, 100)}%`,
+                          width: `${Math.min((h.streak / Math.max(h.allTimeStreak, 30)) * 100, 100)}%`,
                           backgroundColor: h.color,
                         }}
                       />
@@ -272,6 +349,30 @@ export default function TrendsClient({ trends, stats, habits }: Props) {
           </div>
         )}
       </div>
+
+      {/* Per-habit heatmap */}
+      {habits.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h2 className="font-semibold text-white mb-4">12-Week Heatmap</h2>
+          <div className="space-y-5">
+            {habits.map((h) => (
+              <div key={h.id}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0"
+                    style={{ backgroundColor: h.color }}
+                  >
+                    {h.icon}
+                  </div>
+                  <span className="text-sm text-gray-300 truncate">{h.name}</span>
+                </div>
+                <HeatmapGrid logs={h.logs} color={h.color} />
+              </div>
+            ))}
+          </div>
+          <p className="text-gray-600 text-xs mt-3">Each cell = one day · filled = completed</p>
+        </div>
+      )}
 
       {/* Per-habit completion rate */}
       {habitBarData.length > 0 && (

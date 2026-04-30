@@ -25,6 +25,7 @@ export default async function DashboardPage() {
       icon: h.icon,
       streak: await getHabitStreak(h.id),
       completedToday: h.logs.length > 0,
+      todayNote: h.logs[0]?.notes ?? null,
     }))
   );
 

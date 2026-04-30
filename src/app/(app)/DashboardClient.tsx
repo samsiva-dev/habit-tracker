@@ -15,6 +15,7 @@ interface Habit {
   icon: string;
   streak: number;
   completedToday: boolean;
+  todayNote?: string | null;
 }
 
 interface Stats {

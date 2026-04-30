@@ -72,6 +72,37 @@ export async function getHabitStreak(habitId: string): Promise<number> {
   return streak;
 }
 
+export async function getAllTimeStreak(habitId: string): Promise<number> {
+  const logs = await prisma.habitLog.findMany({
+    where: { habitId },
+    orderBy: { completedAt: "asc" },
+    select: { completedAt: true },
+  });
+
+  if (logs.length === 0) return 0;
+
+  const uniqueDays = [
+    ...new Set(logs.map((l) => format(l.completedAt, "yyyy-MM-dd"))),
+  ].sort((a, b) => a.localeCompare(b));
+
+  let best = 1;
+  let current = 1;
+
+  for (let i = 1; i < uniqueDays.length; i++) {
+    const prev = startOfDay(new Date(uniqueDays[i - 1]));
+    const curr = startOfDay(new Date(uniqueDays[i]));
+    const diff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 1) {
+      current++;
+      if (current > best) best = current;
+    } else {
+      current = 1;
+    }
+  }
+
+  return best;
+}
+
 export async function getHabitTrends(
   userId: string,
   days: number = 30
@@ -80,18 +111,17 @@ export async function getHabitTrends(
 
   const habits = await prisma.habit.findMany({
     where: { userId, archivedAt: null },
-    select: { id: true },
+    select: { id: true, targetDays: true, startDate: true, endDate: true },
   });
 
-  const totalHabits = habits.length;
-  if (totalHabits === 0) return [];
+  if (habits.length === 0) return [];
 
   const logs = await prisma.habitLog.findMany({
     where: {
       habitId: { in: habits.map((h) => h.id) },
       completedAt: { gte: startOfDay(startDate) },
     },
-    select: { completedAt: true },
+    select: { habitId: true, completedAt: true },
   });
 
   const result: { date: string; completed: number; total: number }[] = [];
@@ -101,12 +131,23 @@ export async function getHabitTrends(
     const dateStr = format(date, "yyyy-MM-dd");
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
+    const dayOfWeek = date.getDay();
+
+    // Only count habits that are active and scheduled for this specific day
+    const scheduledHabits = habits.filter((h) => {
+      if (h.startDate && h.startDate > dayEnd) return false;
+      if (h.endDate && h.endDate < dayStart) return false;
+      if (h.targetDays.length > 0 && !h.targetDays.includes(dayOfWeek)) return false;
+      return true;
+    });
+
+    const scheduledIds = new Set(scheduledHabits.map((h) => h.id));
 
     const completed = logs.filter(
-      (l) => l.completedAt >= dayStart && l.completedAt <= dayEnd
+      (l) => scheduledIds.has(l.habitId) && l.completedAt >= dayStart && l.completedAt <= dayEnd
     ).length;
 
-    result.push({ date: dateStr, completed, total: totalHabits });
+    result.push({ date: dateStr, completed, total: scheduledHabits.length });
   }
 
   return result;
@@ -121,9 +162,25 @@ export async function getOverallStats(userId: string) {
   const today = new Date();
   const todayStart = startOfDay(today);
   const todayEnd = endOfDay(today);
+  const todayDayOfWeek = today.getDay();
 
-  const completedToday = habits.filter((h) =>
-    h.logs.some((l) => l.completedAt >= todayStart && l.completedAt <= todayEnd)
+  // Helper: is a habit scheduled for a given day?
+  function isScheduledOn(
+    h: { targetDays: number[]; startDate: Date | null; endDate: Date | null },
+    dayStart: Date,
+    dayEnd: Date,
+    dayOfWeek: number
+  ) {
+    if (h.startDate && h.startDate > dayEnd) return false;
+    if (h.endDate && h.endDate < dayStart) return false;
+    if (h.targetDays.length > 0 && !h.targetDays.includes(dayOfWeek)) return false;
+    return true;
+  }
+
+  const completedToday = habits.filter(
+    (h) =>
+      isScheduledOn(h, todayStart, todayEnd, todayDayOfWeek) &&
+      h.logs.some((l) => l.completedAt >= todayStart && l.completedAt <= todayEnd)
   ).length;
 
   const streaks = await Promise.all(
@@ -140,16 +197,21 @@ export async function getOverallStats(userId: string) {
   const bestHabit = streaks.find((s) => s.streak === longestStreak);
 
   const last7Days = Array.from({ length: 7 }, (_, i) => subDays(today, i));
-  const completionRates = last7Days.map((date) => {
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
-    const completed = habits.filter((h) =>
-      h.logs.some(
-        (l) => l.completedAt >= dayStart && l.completedAt <= dayEnd
-      )
-    ).length;
-    return habits.length > 0 ? (completed / habits.length) * 100 : 0;
-  });
+  const completionRates = last7Days
+    .map((date) => {
+      const dayStart = startOfDay(date);
+      const dayEnd = endOfDay(date);
+      const dayOfWeek = date.getDay();
+      const scheduledHabits = habits.filter((h) =>
+        isScheduledOn(h, dayStart, dayEnd, dayOfWeek)
+      );
+      if (scheduledHabits.length === 0) return null;
+      const completed = scheduledHabits.filter((h) =>
+        h.logs.some((l) => l.completedAt >= dayStart && l.completedAt <= dayEnd)
+      ).length;
+      return (completed / scheduledHabits.length) * 100;
+    })
+    .filter((r): r is number => r !== null);
 
   const avgCompletionRate =
     completionRates.length > 0
